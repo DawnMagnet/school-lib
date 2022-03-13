@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
+use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RequestWithCookiesPageList {
     pub id: String,
@@ -31,6 +33,7 @@ pub struct RequestWithCookiesPageList {
     pub timeSpace: i64,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RequestWithCookiesParams {
     pub rooms: RequestWithCookiesRooms,
@@ -38,6 +41,7 @@ pub struct RequestWithCookiesParams {
     pub usetype: String,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RequestWithCookiesRooms {
     pub currentPage: i64,
@@ -52,6 +56,7 @@ pub struct RequestWithCookiesRooms {
     pub pageList: Vec<RequestWithCookiesPageList>,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RequestWithCookiesRootInterface {
     pub status: bool,
@@ -59,12 +64,14 @@ pub struct RequestWithCookiesRootInterface {
     pub params: RequestWithCookiesParams,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RequestWithCookiesTimes {
     pub select: bool,
     pub time: String,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PersonConfig {
     pub config_name: String,
@@ -81,6 +88,7 @@ pub struct PersonConfig {
     pub roomId: Option<String>
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BookStoreInfoConfig {
     pub OPEN_ID: String,
@@ -92,6 +100,7 @@ pub struct BookStoreInfoConfig {
     pub PERSON: Vec<PersonConfig>,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppointMyappionts {
     pub currentPage: i64,
@@ -106,6 +115,7 @@ pub struct AppointMyappionts {
     pub pageList: Vec<AppointPageList>,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppointPageList {
     pub id: String,
@@ -126,17 +136,20 @@ pub struct AppointPageList {
     pub cstatus: Option<i64>,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppointParams {
     pub myappionts: AppointMyappionts,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppointRootInterface {
     pub status: bool,
     pub content: String,
     pub params: AppointParams,
 }
+#[pyclass]
 #[derive(Debug, Clone)]
 pub struct SeatInfo {
     pub id: String,
@@ -144,7 +157,7 @@ pub struct SeatInfo {
     pub times: String,
     pub avai: u32
 }
-
+#[pyclass]
 #[derive(Debug, Clone)]
 pub struct AppointmentInfo {
     pub id: String,
@@ -154,6 +167,7 @@ pub struct AppointmentInfo {
     pub status: i32,
     pub flag: i32,
 }
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppointNode {
     pub _stime: String,
@@ -173,12 +187,14 @@ pub struct AppointNode {
     pub _userid: Option<String>,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppointmentParams {
     pub node: AppointNode,
     pub _id: Option<String>,
 }
 
+#[pyclass]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppointmentRootInterface {
     pub status: bool,

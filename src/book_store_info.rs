@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 use std::time::Duration;
+use pyo3::prelude::*;
 
 use chrono::{Local, NaiveDateTime};
 use regex::Regex;
-use reqwest::{Client, redirect, ClientBuilder};
+use reqwest::blocking::{Client, ClientBuilder};
+use reqwest::redirect;
 use reqwest::header::HeaderMap;
 
 use crate::structs::{AppointmentInfo, AppointmentRootInterface, AppointRootInterface, BookStoreInfoConfig, RequestWithCookiesPageList, RequestWithCookiesRootInterface, SeatInfo};
-
-type MyResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
-
+type MyResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 const COMMON_HEADERS: [(&str, &str); 7] = [
     ("Connection", "keep-alive"),
     ("DNT", "1"),
@@ -37,6 +37,7 @@ fn tr(add_on: &[(&'static str, &str)], default: bool) -> HeaderMap {
 }
 
 #[derive(Debug)]
+#[pyclass]
 pub struct BookStoreInfo {
     pub config_path: String,
     pub config: BookStoreInfoConfig,
@@ -47,8 +48,15 @@ pub struct BookStoreInfo {
     pub appointment_to_be_signed: Vec<AppointmentInfo>,
 }
 
+impl<T, E> pyo3::callback::IntoPyCallbackOutput<T> for std::result::Result<T, E> {
+    fn convert(self, py: Python) -> PyResult<T> {
+        todo!()
+    }
+}
+#[pymethods]
 impl BookStoreInfo {
-    pub async fn new(config_path: &str) -> MyResult<Self> {
+    #[new]
+    pub  fn new(config_path: &str) -> MyResult<Self> {
         let config_str = std::fs::read_to_string(config_path)?;
         let mut res = BookStoreInfo {
             config_path: config_path.to_string(),
@@ -59,24 +67,24 @@ impl BookStoreInfo {
             raw_appointment: Default::default(),
             appointment_to_be_signed: Default::default(),
         };
-        res.refresh_available_info().await?;
-        res.raw_get_appointment_records().await?;
-        Ok(res)
+        res.refresh_available_info()?;
+        res.raw_get_appointment_records()?;
+        MyResult::Ok(res)
     }
-    pub async fn refresh(&mut self) -> MyResult<()> {
-        self.refresh_available_info().await?;
-        self.raw_get_appointment_records().await?;
+    pub  fn refresh(&mut self) -> MyResult<()> {
+        self.refresh_available_info()?;
+        self.raw_get_appointment_records()?;
         println!("REFRESH INFO DONE!");
         Ok(())
     }
-    pub async fn get_origin_info(&mut self, sec: usize) -> MyResult<Vec<SeatInfo>> {
-        let mut result = self.raw_request_with_cookies(sec).await;
+    pub  fn get_origin_info(&mut self, sec: usize) -> MyResult<Vec<SeatInfo>> {
+        let mut result = self.raw_request_with_cookies(sec);
         if result.is_err() {
-            let (jsessionid, x_csrf_token) = self.raw_get_new_cookies().await?;
+            let (jsessionid, x_csrf_token) = self.raw_get_new_cookies()?;
             self.config.JSESSIONID = jsessionid;
             self.config.X_CSRF_TOKEN = x_csrf_token;
             self.write_toml();
-            result = self.raw_request_with_cookies(sec).await;
+            result = self.raw_request_with_cookies(sec);
         }
         let (data, rule_id) = result?;
         self.config.RULE_ID = rule_id;
@@ -100,7 +108,7 @@ impl BookStoreInfo {
                 }
             }).collect())
     }
-    async fn raw_request_with_cookies(&mut self, sec: usize) -> MyResult<(Vec<RequestWithCookiesPageList>, String)> {
+     fn raw_request_with_cookies(&mut self, sec: usize) -> MyResult<(Vec<RequestWithCookiesPageList>, String)> {
         let section = SEC_LIST[sec];
         let unknown = "57879bf578f24a43bae98434682bf176";
         let day_str = Local::now().format("%Y-%m-%d").to_string();
@@ -114,20 +122,20 @@ impl BookStoreInfo {
             .post(url)
             .headers(headermap)
             .body("currentPage=1&pageSize=100")
-            .send().await?
-            .json::<RequestWithCookiesRootInterface>().await?;
+            .send()?
+            .json::<RequestWithCookiesRootInterface>()?;
         let params = res.params;
         Ok((params.rooms.pageList, params.ruleId))
     }
-    async fn raw_get_new_cookies(&mut self) -> MyResult<(String, String)> {
+     fn raw_get_new_cookies(&mut self) -> MyResult<(String, String)> {
         let headers = tr(&[], true);
         let url = format!("http://libwx.cau.edu.cn/remote/static/authIndex?parameter=1&openid={}", self.config.OPEN_ID);
         let res = Client::new()
             .get(&url)
             .headers(headers)
             .timeout(Duration::from_secs(3))
-            .send().await?
-            .text().await?;
+            .send()?
+            .text()?;
         let url_suffix = Regex::new("window.location.href = urls \\+ \"(.*)\";")?
             .captures(&res).unwrap()[0].to_string();
         let headers = tr(
@@ -140,7 +148,7 @@ impl BookStoreInfo {
             .build()?
             .get(format!("http://libwx.cau.edu.cn/space/static/dowechatlogin?type=discuss{}", url_suffix))
             .headers(headers)
-            .send().await?;
+            .send()?;
         let jsessionid = res.headers().get("Set-Cookie").unwrap().to_str()?;
         let jsessionid = &jsessionid[11..43];
         let headers = tr(&[
@@ -150,22 +158,22 @@ impl BookStoreInfo {
         let res = Client::new()
             .get("http://libwx.cau.edu.cn/space/discuss/mobileIndex?linkSign=discuss&type=discuss")
             .headers(headers)
-            .send().await?
-            .text().await?;
+            .send()?
+            .text()?;
         let x_csrf_token = Regex::new("name=\"_csrf\" content=\"(.*)\"")?
             .captures(&res).unwrap()[1].to_string();
         Ok((jsessionid.to_string(), x_csrf_token))
     }
 
-    pub async fn refresh_available_info(&mut self) -> MyResult<()> {
-        let res_1 = self.get_origin_info(1).await?;
-        let res_4 = self.get_origin_info(4).await?;
+    pub  fn refresh_available_info(&mut self) -> MyResult<()> {
+        let res_1 = self.get_origin_info(1)?;
+        let res_4 = self.get_origin_info(4)?;
         self.raw_data = [res_1, res_4].concat();
         self.full_data = self.deal_raw_data(false);
         self.available_data = self.deal_raw_data(true);
         Ok(())
     }
-    async fn raw_get_appointment_records(&mut self) -> MyResult<Vec<AppointmentInfo>> {
+     fn raw_get_appointment_records(&mut self) -> MyResult<Vec<AppointmentInfo>> {
         let headers = tr(&[
             ("Cookie", &format!("JSESSIONID={}", self.config.JSESSIONID)),
             ("Referer", "http://libwx.cau.edu.cn/space/discuss/myAppoint?linkSign=myReserve&type=discuss")
@@ -173,8 +181,8 @@ impl BookStoreInfo {
         let res = Client::new()
             .get("http://libwx.cau.edu.cn/space/discuss/queryAppiont?cday=1970-01-01_to_2050-01-01&sign=&rtypeid=&type=discuss")
             .headers(headers)
-            .send().await?
-            .json::<AppointRootInterface>().await?;
+            .send()?
+            .json::<AppointRootInterface>()?;
         let v_app = res.params.myappionts.pageList.iter()
             .filter(|x| !x.sign)
             .filter(|x| {
@@ -204,7 +212,7 @@ impl BookStoreInfo {
         Ok(res)
     }
 
-    async fn raw_make_one_appointment(&self, room_id: &str, start_hour: i32, remain_hours: i32) -> MyResult<AppointmentRootInterface> {
+     fn raw_make_one_appointment(&self, room_id: &str, start_hour: i32, remain_hours: i32) -> MyResult<AppointmentRootInterface> {
         let now = Local::now();
         let now_str: String = now.to_rfc3339();
         let today = &now_str[0..10];
@@ -227,12 +235,12 @@ impl BookStoreInfo {
             .post("http://libwx.cau.edu.cn/space/form/dynamic/saveFormLock")
             .headers(header)
             .body(data)
-            .send().await?
-            // .text().await?
-            .json::<AppointmentRootInterface>().await?
+            .send()?
+            // .text()?
+            .json::<AppointmentRootInterface>()?
         )
     }
-    pub async fn make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> MyResult<Vec<(Vec<i32>, String)>> {
+    pub  fn make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> MyResult<Vec<(Vec<i32>, String)>> {
         let real_room_id = room_id.unwrap_or(&self.config.PREFER);
         let real_force = force.unwrap_or(false);
         let available_period = if real_force {
@@ -257,8 +265,8 @@ impl BookStoreInfo {
             tmp
         };
         let res_tmp = available_period.iter().map(
-            |available_time_period| async {
-                match self.raw_make_one_appointment(real_room_id, available_time_period[0], available_time_period.len() as i32).await {
+            |available_time_period|  {
+                match self.raw_make_one_appointment(real_room_id, available_time_period[0], available_time_period.len() as i32) {
                     Ok(appoint) => format!("{} {}", appoint.status, appoint.content),
                     Err(e) => e.to_string()
                 }
@@ -266,12 +274,12 @@ impl BookStoreInfo {
         );
         let mut res = vec![];
         for (a, b) in res_tmp.into_iter().enumerate() {
-            res.push((available_period[a].clone(), b.await));
+            res.push((available_period[a].clone(), b));
         }
         Ok(res)
     }
-    // pub async fn cancel_appointment(&mut self, ) -> MyResult<Response> {}
-    pub async fn raw_sign(&mut self, sign_config: Option<String>, room_id: Option<String>) -> MyResult<String> {
+    // pub  fn cancel_appointment(&mut self, ) -> MyResult<Response> {}
+    pub fn raw_sign(&mut self, sign_config: Option<String>, room_id: Option<String>) -> MyResult<String> {
         let real_sign_config = sign_config.unwrap_or_else(|| "config1".to_string());
         let real_room_id = room_id.unwrap_or({
             if self.appointment_to_be_signed.is_empty() {
@@ -292,8 +300,8 @@ impl BookStoreInfo {
             .get("http://libwx.cau.edu.cn/space/static/cau/mediaCheckIn")
             .headers(headers)
             .query(&params)
-            .send().await?
-            .text().await?;
+            .send()?
+            .text()?;
         let res = &Regex::new("<span>(.*)</span>")?
             .captures(&res).unwrap()[1];
         match res {
@@ -320,17 +328,15 @@ impl BookStoreInfo {
         res.reverse();
         res
     }
-    pub fn show_seat_info(v: &[SeatInfo]) {
-        if !v.is_empty() {
-            println!("{:^32}\t{:^21}\t{:^14}\tavai", "id", "rname", "times");
-            for seat in v {
-                println!("{}\t{}\t{}\t  {}", &seat.id, &seat.rname, &seat.times, &seat.avai);
-            }
-        } else {
-            println!("[INFO] SEAT LIST NO DATA")
+}
+#[pyfunction]
+pub fn show_seat_info(v: Vec<SeatInfo>) {
+    if !v.is_empty() {
+        println!("{:^32}\t{:^21}\t{:^14}\tavai", "id", "rname", "times");
+        for seat in v {
+            println!("{}\t{}\t{}\t  {}", &seat.id, &seat.rname, &seat.times, &seat.avai);
         }
-    }
-    pub async fn test() {
-
+    } else {
+        println!("[INFO] SEAT LIST NO DATA")
     }
 }
