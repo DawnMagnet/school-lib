@@ -13,7 +13,7 @@ impl Number {
 }
 
 #[pymodule]
-fn my_module(_py: Python, m: &PyModule) -> PyResult<()> {
+fn school_library(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Number>()?;
     m.add_class::<book_store_info::BookStoreInfo>()?;
     Ok(())

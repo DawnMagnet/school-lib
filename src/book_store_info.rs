@@ -48,15 +48,8 @@ pub struct BookStoreInfo {
     pub appointment_to_be_signed: Vec<AppointmentInfo>,
 }
 
-impl<T, E> pyo3::callback::IntoPyCallbackOutput<T> for std::result::Result<T, E> {
-    fn convert(self, py: Python) -> PyResult<T> {
-        todo!()
-    }
-}
-#[pymethods]
 impl BookStoreInfo {
-    #[new]
-    pub  fn new(config_path: &str) -> MyResult<Self> {
+    pub fn new(config_path: &str) -> MyResult<Self> {
         let config_str = std::fs::read_to_string(config_path)?;
         let mut res = BookStoreInfo {
             config_path: config_path.to_string(),
@@ -280,6 +273,7 @@ impl BookStoreInfo {
     }
     // pub  fn cancel_appointment(&mut self, ) -> MyResult<Response> {}
     pub fn raw_sign(&mut self, sign_config: Option<String>, room_id: Option<String>) -> MyResult<String> {
+        println!("SIGNCONFIG {:?}", sign_config);
         let real_sign_config = sign_config.unwrap_or_else(|| "config1".to_string());
         let real_room_id = room_id.unwrap_or({
             if self.appointment_to_be_signed.is_empty() {
@@ -328,15 +322,44 @@ impl BookStoreInfo {
         res.reverse();
         res
     }
-}
-#[pyfunction]
-pub fn show_seat_info(v: Vec<SeatInfo>) {
-    if !v.is_empty() {
-        println!("{:^32}\t{:^21}\t{:^14}\tavai", "id", "rname", "times");
-        for seat in v {
-            println!("{}\t{}\t{}\t  {}", &seat.id, &seat.rname, &seat.times, &seat.avai);
+    pub fn show_seat_info(v: &[SeatInfo]) {
+        if !v.is_empty() {
+            println!("{:^32}\t{:^21}\t{:^14}\tavai", "id", "rname", "times");
+            for seat in v {
+                println!("{}\t{}\t{}\t  {}", &seat.id, &seat.rname, &seat.times, &seat.avai);
+            }
+        } else {
+            println!("[INFO] SEAT LIST NO DATA")
         }
-    } else {
-        println!("[INFO] SEAT LIST NO DATA")
     }
+}
+
+#[pymethods]
+/// Export Python Methods
+impl BookStoreInfo {
+    #[new]
+    pub fn py_new(config_path: &str) -> Self {
+        BookStoreInfo::new(config_path).unwrap()
+    }
+    #[pyo3(name = "sign")]
+    pub fn py_sign(&mut self, sign_config: Option<String>, room_id: Option<String>) -> String {
+        self.raw_sign(sign_config, room_id).unwrap()
+    }
+    #[pyo3(name = "make_one_seat_every_appointment")]
+    pub fn py_make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> Vec<(Vec<i32>, String)> {
+        self.make_one_seat_every_appointment(room_id, force).unwrap()
+    }
+    #[pyo3(name = "show_full_data")]
+    pub fn py_show_full_data(&self) {
+        Self::show_seat_info(&self.full_data);
+    }
+    #[pyo3(name = "show_raw_data")]
+    pub fn py_show_raw_data(&self) {
+        Self::show_seat_info(&self.raw_data);
+    }
+    #[pyo3(name = "show_available_data")]
+    pub fn py_show_available_data(&self) {
+        Self::show_seat_info(&self.available_data);
+    }
+
 }
