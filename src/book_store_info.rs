@@ -35,6 +35,14 @@ fn tr(add_on: &[(&'static str, &str)], default: bool) -> HeaderMap {
     }
     res
 }
+fn deal_rname(s: &str) -> String {
+    let vec_ch: Vec<char> = s.chars().collect();
+    if vec_ch.len() != 13 {
+        "InValid RoomID".to_string()
+    } else {
+        format!("{}-{}-{}{}", vec_ch[2].to_string().into_bytes()[2] - 159, vec_ch[8], vec_ch[10], vec_ch[11])
+    }
+}
 
 #[derive(Debug)]
 #[pyclass]
@@ -233,7 +241,7 @@ impl BookStoreInfo {
             .json::<AppointmentRootInterface>()?
         )
     }
-    pub  fn make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> MyResult<Vec<(Vec<i32>, String)>> {
+    pub  fn make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> MyResult<Vec<(Vec<i32>, (String, String))>> {
         let real_room_id = room_id.unwrap_or(&self.config.PREFER);
         let real_force = force.unwrap_or(false);
         let available_period = if real_force {
@@ -260,8 +268,8 @@ impl BookStoreInfo {
         let res_tmp = available_period.iter().map(
             |available_time_period|  {
                 match self.raw_make_one_appointment(real_room_id, available_time_period[0], available_time_period.len() as i32) {
-                    Ok(appoint) => format!("{} {}", appoint.status, appoint.content),
-                    Err(e) => e.to_string()
+                    Ok(appoint) => (appoint.status.to_string(), appoint.content),
+                    Err(e) => ("error".to_string(), e.to_string())
                 }
             }
         );
@@ -273,7 +281,6 @@ impl BookStoreInfo {
     }
     // pub  fn cancel_appointment(&mut self, ) -> MyResult<Response> {}
     pub fn raw_sign(&mut self, sign_config: Option<String>, room_id: Option<String>) -> MyResult<String> {
-        println!("SIGNCONFIG {:?}", sign_config);
         let real_sign_config = sign_config.unwrap_or_else(|| "config1".to_string());
         let real_room_id = room_id.unwrap_or({
             if self.appointment_to_be_signed.is_empty() {
@@ -324,9 +331,19 @@ impl BookStoreInfo {
     }
     pub fn show_seat_info(v: &[SeatInfo]) {
         if !v.is_empty() {
-            println!("{:^32}\t{:^21}\t{:^14}\tavai", "id", "rname", "times");
+            println!("               id                rname      times      A");
             for seat in v {
-                println!("{}\t{}\t{}\t  {}", &seat.id, &seat.rname, &seat.times, &seat.avai);
+                println!("{} {} {} {}", &seat.id, deal_rname(&seat.rname), &seat.times, &seat.avai);
+            }
+        } else {
+            println!("[INFO] SEAT LIST NO DATA")
+        }
+    }
+    pub fn show_appointment_info(v: &[AppointmentInfo]) {
+        if !v.is_empty() {
+            println!("               id                   date    begin  end  rname  F S");
+            for appoint in v {
+                println!("{} {} {} {} {} {}", &appoint.id, &appoint.begin_time, &appoint.end_time, deal_rname(&appoint.rname), &appoint.flag, &appoint.status);
             }
         } else {
             println!("[INFO] SEAT LIST NO DATA")
@@ -346,7 +363,7 @@ impl BookStoreInfo {
         self.raw_sign(sign_config, room_id).unwrap()
     }
     #[pyo3(name = "make_one_seat_every_appointment")]
-    pub fn py_make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> Vec<(Vec<i32>, String)> {
+    pub fn py_make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> Vec<(Vec<i32>, (String, String))> {
         self.make_one_seat_every_appointment(room_id, force).unwrap()
     }
     #[pyo3(name = "show_full_data")]
@@ -361,5 +378,12 @@ impl BookStoreInfo {
     pub fn py_show_available_data(&self) {
         Self::show_seat_info(&self.available_data);
     }
-
+    #[pyo3(name = "show_raw_appointment")]
+    pub fn py_show_raw_appointment(&self) {
+        Self::show_appointment_info(&self.raw_appointment);
+    }
+    #[pyo3(name = "show_appointment_to_be_signed")]
+    pub fn py_show_appointment_to_be_signed(&self) {
+        Self::show_appointment_info(&self.appointment_to_be_signed);
+    }
 }
