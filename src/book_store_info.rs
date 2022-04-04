@@ -3,6 +3,7 @@ use std::time::Duration;
 use pyo3::prelude::*;
 
 use chrono::{Local, NaiveDateTime};
+use pyo3::exceptions::PyRuntimeError;
 use regex::Regex;
 use reqwest::blocking::{Client, ClientBuilder};
 use reqwest::redirect;
@@ -72,10 +73,10 @@ impl BookStoreInfo {
         res.raw_get_appointment_records()?;
         MyResult::Ok(res)
     }
-    pub  fn refresh(&mut self) -> MyResult<()> {
+    pub fn refresh(&mut self) -> MyResult<()> {
         self.refresh_available_info()?;
         self.raw_get_appointment_records()?;
-        println!("REFRESH INFO DONE!");
+        // println!("REFRESH INFO DONE!");
         Ok(())
     }
     pub  fn get_origin_info(&mut self, sec: usize) -> MyResult<Vec<SeatInfo>> {
@@ -355,16 +356,16 @@ impl BookStoreInfo {
 /// Export Python Methods
 impl BookStoreInfo {
     #[new]
-    pub fn py_new(config_path: &str) -> Self {
-        BookStoreInfo::new(config_path).unwrap()
+    pub fn py_new(config_path: &str) -> PyResult<Self> {
+        BookStoreInfo::new(config_path).or(Err(PyRuntimeError::new_err("Initialize Unsuccessful")))
     }
     #[pyo3(name = "sign")]
-    pub fn py_sign(&mut self, sign_config: Option<String>, room_id: Option<String>) -> String {
-        self.raw_sign(sign_config, room_id).unwrap()
+    pub fn py_sign(&mut self, sign_config: Option<String>, room_id: Option<String>) -> PyResult<String> {
+        self.raw_sign(sign_config, room_id).or(Err(PyRuntimeError::new_err("Sign Unsuccessful")))
     }
     #[pyo3(name = "make_one_seat_every_appointment")]
-    pub fn py_make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> Vec<(Vec<i32>, (String, String))> {
-        self.make_one_seat_every_appointment(room_id, force).unwrap()
+    pub fn py_make_one_seat_every_appointment(&self, room_id: Option<&str>, force: Option<bool>) -> PyResult<Vec<(Vec<i32>, (String, String))>> {
+        self.make_one_seat_every_appointment(room_id, force).or(Err(PyRuntimeError::new_err("Unable to make one seat every appointment")))
     }
     #[pyo3(name = "show_full_data")]
     pub fn py_show_full_data(&self) {
@@ -385,5 +386,9 @@ impl BookStoreInfo {
     #[pyo3(name = "show_appointment_to_be_signed")]
     pub fn py_show_appointment_to_be_signed(&self) {
         Self::show_appointment_info(&self.appointment_to_be_signed);
+    }
+    #[pyo3(name = "refresh")]
+    pub fn py_refresh(&mut self) -> PyResult<()> {
+        self.refresh().or(Err(PyRuntimeError::new_err("Refresh Unsuccessful")))
     }
 }

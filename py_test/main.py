@@ -24,7 +24,7 @@ def make_new_line():
 
 @scheduler.scheduled_job('cron', minute='5, 30', hour='7-22', id="refresh", max_instances=100)
 def refresh():
-    bi.__init__("config.toml")
+    bi.refresh()
     print(cur_time_str(), "config1", bi.sign('config1'))
     print(cur_time_str(), "config2", bi.sign('config2'))
     make_new_line()
